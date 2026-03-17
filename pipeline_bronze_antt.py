@@ -14,9 +14,7 @@ os.makedirs(pasta, exist_ok=True)
 response = requests.get(API, headers=headers, timeout=60)
 resources = response.json()["result"]["resources"]
 
-# =========================
 # LOG DE RECURSOS
-# =========================
 
 log_recursos = []
 
@@ -36,9 +34,7 @@ log_df.to_csv("log/log_recursos_antt.csv", index=False)
 
 print("Log de recursos atualizado")
 
-# =========================
 # DOWNLOAD DOS ARQUIVOS
-# =========================
 
 arquivos = []
 
@@ -64,11 +60,9 @@ for recurso in resources:
                     print("Erro de download. Tentando novamente...")
                     time.sleep(5)
 
-        arquivos.append((caminho, nome))  # ← guarda nome junto
+        arquivos.append((caminho, nome)) 
 
-# =========================
 # LEITURA DOS CSVs
-# =========================
 
 dfs = []
 
@@ -92,7 +86,7 @@ for caminho, nome_arquivo in arquivos:
             encoding="latin1",
             sep=";",
             header=None,
-            dtype=str,           # 🔥 chave aqui
+            dtype=str,           
             low_memory=False
         )
 
@@ -106,7 +100,6 @@ for caminho, nome_arquivo in arquivos:
             .str.contains("concessionaria", na=False)
         ]
 
-        # 🔥 metadado de origem (MUITO importante)
         df_temp["arquivo_origem"] = nome_arquivo
 
         dfs.append(df_temp)
@@ -115,17 +108,13 @@ for caminho, nome_arquivo in arquivos:
         print("Erro ao ler:", caminho)
         print(e)
 
-# =========================
 # CONSOLIDAÇÃO
-# =========================
 
 df = pd.concat(dfs, ignore_index=True)
 
 print("Linhas totais:", len(df))
 
-# =========================
 # DIAGNÓSTICO
-# =========================
 
 os.makedirs("evidencias", exist_ok=True)
 
@@ -157,9 +146,7 @@ def diagnostico_dados(df):
 
 diagnostico_dados(df)
 
-# =========================
 # OUTPUT BRONZE
-# =========================
 
 os.makedirs("bronze", exist_ok=True)
 
