@@ -29,7 +29,7 @@ A abordagem adotada garante trêm benefícios principais:
 - Permite análises temporais mais completas
 - Torna o processo reprodutível e automatizado
 
-Para isso, foi desenvolvido um [script em Python](https://github.com/elisamanuelle/antt_analise_trafego/new/main/pipeline_bronze_antt.py) responsável por acessar automaticamente a API do portal de dados da ANTT, identificar todos os arquivos disponíveis e realizar o download dos arquivos em formato CSV.
+Para isso, foi desenvolvido um [script em Python](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/pipeline_bronze_antt.py) responsável por acessar automaticamente a API do portal de dados da ANTT, identificar todos os arquivos disponíveis e realizar o download dos arquivos em formato CSV.
 
 ### Processo de coleta automatizada
 
@@ -37,10 +37,10 @@ O pipeline de ingestão foi implementado utilizando as bibliiotecas ``requests``
 
 O fluxo de ingestão funciona da seguinte forma:
 1. Consulta à API do portal de dados da ANTT para identificar todos os recursos disponíveis no dataset.
-2. Registro das informações de cada recurso (nome do arquivo, formato, tamanho e URL) em um [log de ingestão](https://github.com/elisamanuelle/antt_analise_trafego/new/main/log), permitindo rastrear quais arquivos estavam disponíveis no momento da coleta.
+2. Registro das informações de cada recurso (nome do arquivo, formato, tamanho e URL) em um [log de ingestão](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/log), permitindo rastrear quais arquivos estavam disponíveis no momento da coleta.
 3. Download automático de todos os arquivos CSV do dataset.
 4. Armazenamento dos arquivos em uma pasta local para manter uma cópia bruta dos dados.
-5. Leitura e consolidação dos arquivos em um único [dataset estruturado em formato parquet](https://github.com/elisamanuelle/antt_analise_trafego/new/main/bronze).
+5. Leitura e consolidação dos arquivos em um único [dataset estruturado em formato parquet](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/bronze).
 
 Durante essa etapa foram aplicadas apenas padronizações estruturais mínimas, como:
 
@@ -141,7 +141,7 @@ evidencias/
 
 Não foram identificados valores nulos no dataset.
 
-→ [evidencias/nulos.csv](https://github.com/elisamanuelle/antt_analise_trafego/new/main/evidencias/nulos.csv)
+→ [evidencias/nulos.csv](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/evidencias/nulos.csv)
 
 No entanto, essa ausência não garante qualidade plena, pois os dados foram ingeridos como texto, podendo mascarar valores ausentes representados como strings.
 
@@ -149,7 +149,7 @@ No entanto, essa ausência não garante qualidade plena, pois os dados foram ing
 
 Foram identificadas **72.035 linhas duplicadas**, representando pouco mais de 1% do dataset.
 
-→ [evidencias/duplicados_amostra.csv](https://github.com/elisamanuelle/antt_analise_trafego/new/main/evidencias/duplicados_amostra.csv)
+→ [evidencias/duplicados_amostra.csv](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/evidencias/duplicados_amostra.csv)
 
 Essas duplicidades não são apenas registros repetidos, mas indicam a coexistência de diferentes níveis de granularidade:
 
@@ -164,7 +164,7 @@ Portanto, torna-se necessário tratar a granularidade antes da análise, garanti
 
 Na coluna `tipo_de_veiculo`, foram identificadas múltiplas representações para a mesma categoria:
 
-→ [evidencias/amostra_valores.csv](https://github.com/elisamanuelle/antt_analise_trafego/new/main/evidencias/amostra_valores.csv)
+→ [evidencias/amostra_valores.csv](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/evidencias/amostra_valores.csv)
 
 Exemplo:
 
@@ -189,7 +189,7 @@ A coluna `categoria_eixo` apresenta mistura de formatos:
 | Numérico | 6.290.836       |
 | Texto    | 754.203         |
 
-→ [evidencias/tipos_mistos.csv](https://github.com/elisamanuelle/antt_analise_trafego/new/main/evidencias/tipos_mistos.csv)
+→ [evidencias/tipos_mistos.csv](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/evidencias/tipos_mistos.csv)
 
 Isso evidencia inconsistência na modelagem do dado, com múltiplos padrões de registro.
 
@@ -203,7 +203,7 @@ A coluna `volume_total` está armazenada como texto com formatação brasileira:
 703,00
 ```
 
-→ [evidencias/amostra_valores.csv](https://github.com/elisamanuelle/antt_analise_trafego/new/main/evidencias/amostra_valores.csv)
+→ [evidencias/amostra_valores.csv](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/evidencias/amostra_valores.csv)
 
 Esse formato impede o uso direto em cálculos, exigindo conversão para tipo numérico.
 
@@ -253,7 +253,7 @@ Por fim, os dados foram agregados considerando concessionária, período, praça
 
 O resultado dessa camada é um dataset limpo, padronizado e consistente, salvo em:
 
-[silver/antt_trafego_silver.parquet](https://github.com/elisamanuelle/antt_analise_trafego/new/main/silver)
+[silver/antt_trafego_silver.parquet](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/silver)
 
 ## Camada Gold (Modelo Analítico)
 
@@ -489,7 +489,7 @@ Os indicadores foram estruturados para responder, de forma integrada:
 
 ## Visualizações
 
-O [dashboard](https://github.com/elisamanuelle/antt_analise_trafego/new/main/Tráfego por Praça.pdf) foi estruturado com foco em responder, de forma clara e direta, as principais perguntas de negócio relacionadas ao tráfego, desgaste da infraestrutura e eficiência operacional da concessionária.
+O [dashboard](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/Tráfego por Praça.pdf) foi estruturado com foco em responder, de forma clara e direta, as principais perguntas de negócio relacionadas ao tráfego, desgaste da infraestrutura e eficiência operacional da concessionária.
 
 A escolha dos visuais seguiu o princípio de clareza analítica mais apoio à decisão, evitando excesso de elementos e priorizando leitura rápida.
 
