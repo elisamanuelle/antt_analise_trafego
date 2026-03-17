@@ -51,7 +51,7 @@ Nenhuma transformação analítica foi realizada nesta fase. Todos os dados fora
 
 ## Exploração
 
-O [dataset consolidado]() contém **7.045.039 registros** e as seguintes colunas:
+O [dataset consolidado](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/bronze) contém **7.045.039 registros** e as seguintes colunas:
 
 | Coluna          | Descrição                                            |
 | --------------- | ---------------------------------------------------- |
@@ -65,15 +65,13 @@ O [dataset consolidado]() contém **7.045.039 registros** e as seguintes colunas
 | volume_total    | Quantidade de veículos registrados                   |
 | arquivo_origem  | Nome do arquivo de origem do dado                    |
 
-
-
 ### Metadado de origem
 
 Durante a ingestão, foi adicionada a coluna `arquivo_origem`, permitindo rastrear a origem de cada registro.
 
 Esse metadado foi essencial para identificar diferenças estruturais entre os arquivos disponibilizados pela ANTT, especialmente:
 
-- coexistência de dados **diários e mensais**
+- coexistência de dados diários e mensais
 - variações no formato da coluna de data
 - inconsistências de padronização entre anos
 
@@ -489,7 +487,7 @@ Os indicadores foram estruturados para responder, de forma integrada:
 
 ## Visualizações
 
-O [dashboard](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/Tráfego por Praça.pdf) foi estruturado com foco em responder, de forma clara e direta, as principais perguntas de negócio relacionadas ao tráfego, desgaste da infraestrutura e eficiência operacional da concessionária.
+O [dashboard](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/trafego_cro_2024.pdf) foi estruturado com foco em responder, de forma clara e direta, as principais perguntas de negócio relacionadas ao tráfego, desgaste da infraestrutura e eficiência operacional da concessionária.
 
 A escolha dos visuais seguiu o princípio de clareza analítica mais apoio à decisão, evitando excesso de elementos e priorizando leitura rápida.
 
@@ -562,8 +560,9 @@ O dashboard foi estruturado em uma única página com organização hierárquica
 ## Insights
 A análise dos dados de tráfego da concessionária evidencia padrões relevantes tanto do ponto de vista operacional quanto de infraestrutura.
 
-Analisando a concessionária CRO em 2024:
+Analisando a concessionária [CRO em 2024](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/trafego_cro_2024.pdf):
 
+<img width="1474" height="828" alt="image" src="https://github.com/user-attachments/assets/33a26a9e-be22-45b4-8e6a-04605ddcdbb1" />
 
 **1. Concentração de desgaste em veículos pesados**
 
