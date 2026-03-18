@@ -1,4 +1,4 @@
-<img width="1472" height="823" alt="image" src="https://github.com/user-attachments/assets/8bdde943-a1e5-4e27-b47b-27057a4a1008" /># Volume de tráfego por Praça
+# Volume de tráfego por Praça
 ``Concessionária Rota do Oeste (CRO)``
 
 ## Contexto
