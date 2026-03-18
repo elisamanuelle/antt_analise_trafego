@@ -7,7 +7,7 @@ O objetivo do projeto é analisar o tráfego da concessionária Rota do Oeste (C
 
 Embora o recorte analítico esteja centrado na CRO, a ingestão foi estruturada para considerar todo o dataset nacional. Essa decisão garante integridade histórica, padronização das métricas e comparabilidade entre concessionárias, além de permitir expansão futura do modelo sem necessidade de reprocessamento estrutural.
 
-O pipeline foi construído em camadas (Bronze, Silver e Gold), com tratamento de inconsistências, deduplicação e consolidação de granularidade mensal, assegurando que os indicadores derivados reflitam o comportamento real do tráfego — e não artefatos de dados.
+O pipeline foi construído em camadas (Bronze, Silver e Gold), com tratamento de inconsistências, deduplicação e consolidação de granularidade mensal, assegurando que os indicadores derivados reflitam o comportamento real do tráfego, e não artefatos de dados.
 
 A análise vai além da descrição volumétrica e busca interpretar o sistema rodoviário sob uma ótica operacional. Para isso, foram definidos indicadores que capturam não apenas fluxo, mas também impacto e concentração, como o Volume Médio Diário (VMD) e o índice de criticidade (gargalo), que combina volume, desgaste e participação no fluxo.
 
