@@ -888,3 +888,25 @@ Os cenários mostram um padrão consistente: o problema não é apenas quanto pa
 
 A combinação entre volume, composição e concentração permite priorizar ações com mais precisão, saindo de uma gestão reativa para uma abordagem orientada por dados.
 
+## Implicações de Negócio
+
+Os resultados indicam que o volume de tráfego, isoladamente, não é um bom indicador de impacto operacional. Praças com menor volume podem apresentar maior criticidade quando há concentração de veículos pesados.
+
+Isso implica que decisões baseadas apenas em fluxo total podem levar a alocação ineficiente de recursos, especialmente em manutenção de pavimento e gestão operacional.
+
+## Recomendações
+
+Com base nos resultados, recomenda-se:
+
+- Priorizar manutenção preventiva nas praças com maior índice de gargalo, especialmente aquelas com alta concentração de veículos pesados.
+- Monitorar continuamente a composição do tráfego (leve vs pesado), pois o impacto estrutural não cresce de forma linear.
+- Avaliar a distribuição entre tipos de cobrança nas praças mais críticas, visando reduzir possíveis pontos de lentidão operacional.
+- Utilizar o índice de gargalo como indicador complementar ao volume para tomada de decisão estratégica.
+
+## Limitações
+
+O fator de desgaste foi estimado com base na categoria de eixo, como uma aproximação da carga dos veículos. Como o dataset não fornece peso real por eixo, o indicador representa uma proxy e não uma medição direta.
+
+Além disso, em casos de inconsistência de dados, foi adotada uma abordagem conservadora (valor máximo) para evitar subestimação do volume, o que pode introduzir viés em cenários específicos.
+
+**Essas limitações devem ser consideradas na interpretação dos resultados.**
