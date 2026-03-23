@@ -1,244 +1,223 @@
-# Volume de tráfego por Praça
-``Concessionária Rota do Oeste (CRO)``
+# Análise de Tráfego Rodoviário - ANTT (CRO)
 
-## Contexto
+## Sumário
+* [1. Case de Negócio](#1-case-de-negócio)
+    * [Contexto](#contexto)
+    * [Problema](#problema)
+    * [Hipótese](#hipótese)
+    * [Abordagem Analítica](#abordagem-analítica)
+    * [Construção dos Dados](#construção-dos-dados)
+    * [Insights](#insights)
+    * [Recomendações](#recomendações)
+    * [Impacto Potencial](#impacto-potencial)
+* [2. Desenvolvimento Técnico](#2-desenvolvimento-técnico)
+    * [Camada Bronze](#camada-bronze)
+    * [Camada Silver](#camada-silver)
+    * [Camada Gold](#camada-gold)
+    * [Indicadores](#indicadores)
+    * [Visualizações](#visualizações)
+    * [Limitações](#limitações)
 
-O objetivo do projeto é analisar o tráfego da concessionária Rota do Oeste (CRO) a partir dos dados abertos disponibilizados pela ANTT, com foco em transformar dados brutos em indicadores que apoiem leitura operacional da rodovia.
 
-Embora o recorte analítico esteja centrado na CRO, a ingestão foi estruturada para considerar todo o dataset nacional. Essa decisão garante integridade histórica, padronização das métricas e comparabilidade entre concessionárias, além de permitir expansão futura do modelo sem necessidade de reprocessamento estrutural.
+## 1. Case de Negócio
 
-O pipeline foi construído em camadas (Bronze, Silver e Gold), com tratamento de inconsistências, deduplicação e consolidação de granularidade mensal, assegurando que os indicadores derivados reflitam o comportamento real do tráfego, e não artefatos de dados.
+### Contexto
+O tráfego rodoviário tem como um dos seus principais parâmetros o ```volume absoluto de veículos```. No entanto, a engenharia de tráfego raramente utiliza apenas esse indicador. Ele é analisado em conjunto com outras métricas como ```composição do tráfego``` por exemplo. Além disso, é possível analisar que nem todos os veículos impactam a infraestrutura da via da mesma forma.
 
-A análise vai além da descrição volumétrica e busca interpretar o sistema rodoviário sob uma ótica operacional. Para isso, foram definidos indicadores que capturam não apenas fluxo, mas também impacto e concentração, como o Volume Médio Diário (VMD) e o índice de criticidade (gargalo), que combina volume, desgaste e participação no fluxo.
+Este projeto utiliza dados abertos da **Agência Nacional de Transportes Terrestres (ANTT)** para analisar a concessionária Rota do Oeste (CRO), com o objetivo de transformar dados operacionais em indicadores de pressão sobre a rodovia.
 
-Nesse contexto, o projeto busca responder, de forma estruturada:
+*[Retornar ao sumário](#sumário)*
 
-- Como evolui o volume médio diário de veículos ao longo do tempo?
-- Qual o papel dos veículos comerciais no desgaste da rodovia?
-- Existem padrões de sazonalidade no tráfego?
-- Como o fluxo se distribui entre diferentes formas de cobrança e sentidos?
-- Quais praças concentram maior pressão operacional e potencial risco estrutural?
+---
+### Problema
+Se concentrar em indicadores como ```volume absoluto de veículos```, sem combinar com outros que avaliam outros aspectos do tráfego e via, gera resposta apenas para a pergunta simples *"quantos veículos passam?"*, não respondendo questionamentos importantes como:
+* Onde o sistema está mais pressionado?
+* Quais pontos geram maior desgate estrutural?
+* Onde priorizar investimento ou manutenção?
 
-Com isso, o tráfego deixa de ser apenas uma contagem de veículos e passa a ser interpretado como um proxy de pressão sobre a infraestrutura, permitindo identificar pontos críticos, apoiar decisões operacionais e orientar priorização de investimentos.
+O que acaba levando a tomada de decisões reativas e potencialmente ineficientes.
 
-## Ingestão
+*[Retornar ao sumário](#sumário)*
 
-Antes da etapa analítica, foi necessário estruturar a ingestão dos dados disponibilizados pela ANTT de forma automatizada e controlada.
+---
+### Hipótese
+É possível que praças com menor ``volume médio diário de veículos`` podem apresentar uma maior criticidade quando há uma maior concentração de veículos pesados transitando. Isto é, a rodovia é impactada pela composição do tráfego, além do próprio ``volume absoluto de veículos``. 
 
-O dataset “Volume de Tráfego por Praça de Pedágio” é publicado em múltiplos arquivos CSV, variando por ano e por tipo de consolidação (diária e mensal). Como o objetivo do projeto é analisar o comportamento do tráfego da Rota do Oeste (CRO) com consistência histórica, a ingestão foi desenhada para percorrer todo o catálogo disponível na API, mas com critérios claros de seleção.
+*[Retornar ao sumário](#sumário)*
 
-Foram considerados apenas arquivos com granularidade **mensal** e com período a partir de **2016**, garantindo comparabilidade temporal e evitando mistura de granularidades (um dos principais problemas identificados na fase inicial do projeto). Nos anos mais recentes, onde coexistem versões “mensal” e “mensal consolidado”, foi priorizada a versão consolidada, assegurando consistência dos dados.
+---
+### Abordagem analítica
+A análise foi estruturada em três dimensões principais para avaliação da criticidade operacional:
+* **Volume de tráfego**: volume absoluto de veículos
+* **Desgate**: impacto dos veículos na estrutura, considerando a <span style="color:red"> "Lei da Quarta Potência" </span>
+* **Concentração**: participação da praça no fluxo total
 
-Essa abordagem traz três benefícios principais:
+A combinação dessas dimensões resultou na criação de um KPI personalizado para gestão de praças de pedágio: *Índice de Gargalo Operacional*. 
 
-- Preserva a integridade histórica relevante para análise
-- Evita distorções causadas por dados diários e duplicidades de publicação
-- Mantém o processo totalmente reprodutível
+O cálculo sugere que se uma praça de pedágio tem muito tráfego, com veículos que causam muito desgate, e essa praça concentra a maior parte do fluxo de uma rodovia, o índice será alto, indicando um **gargalo crítico** que necessita de intervenção operacional.
 
-Para isso, foi desenvolvido um [script em Python](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/pipeline_bronze_antt.py) responsável por consumir a API da ANTT, filtrar os recursos válidos e realizar o download automatizado dos arquivos.
+A fórmula criada foi uma maneira encontrada para quantificar o risco de congestionamento e a necessidade de manutenção em um ponto específico.
 
-### Processo de coleta automatizada
+*[Retornar ao sumário](#sumário)*
 
-O pipeline de ingestão foi implementado utilizando as bibliotecas `requests` e `pandas`, seguindo um fluxo estruturado:
+---
+### Construção dos dados
 
-1. Consulta à API do portal de dados da ANTT para listar todos os recursos do dataset.
-2. Normalização dos nomes dos arquivos para viabilizar filtros consistentes (remoção de acentos e padronização textual).
-3. Aplicação de regras de seleção:
-   - inclusão apenas de arquivos CSV
-   - exclusão de arquivos com granularidade diária
-   - seleção de arquivos a partir de 2016
-   - priorização de versões “mensal consolidado” quando disponíveis
-4. Registro dos metadados dos recursos em um [log de ingestão](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/log), garantindo rastreabilidade da coleta.
-5. Download automático dos arquivos selecionados, com controle de tentativas para evitar falhas de rede.
-6. Armazenamento local dos arquivos brutos, preservando a fonte original.
-7. Leitura e consolidação dos arquivos em um único [dataset em formato parquet](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/bronze), estruturado para as próximas etapas do pipeline.
+Os dados utilizados foram organizados em pipeline em camadas:
 
-### Considerações sobre a camada Bronze
+* Bronze: camada de ingestão automatizada de dados via API da ANTT
+* Silver: camada de tratamento, padronização e resolução de inconsistências
+* Gold: camada de modelagem dimensional adotando o modelo estrela (Star Schema)
 
-Nesta etapa, foram aplicadas apenas transformações estruturais mínimas, com o objetivo de padronizar os dados sem alterar seu conteúdo analítico:
+Nesse processo foram tratados problemas estruturais relevantes como:
+* Mistura de granularidade de dados diário com mensal
+* Problemas com inconsistência de datas
+* Variações categóricas
+* Linhas com duplicidades
 
-- Padronização do número de colunas
-- Remoção de linhas de cabeçalho replicadas nos arquivos
-- Inclusão de metadados de origem (arquivo) para rastreabilidade
-- Remoção de duplicidades exatas entre arquivos
+Resultado após tratamento:
+* Granularidade consistente (mantendo apenas dados mensais)
+* Dados sem duplicidade
+* Base confiável para análise
 
-Nenhuma regra de negócio ou agregação foi aplicada nesta fase. A camada Bronze mantém os dados o mais próximo possível da origem, garantindo transparência e possibilitando reprocessamentos futuros sem perda de informação.
+*[Retornar ao sumário](#sumário)*
 
-## Exploração
+---
+### Insights
 
-Após a ingestão e aplicação dos critérios de seleção (dados **mensais**, a partir de **2016** e priorizando versões consolidadas), o dataset resultante apresenta uma base consistente para análise, eliminando o principal risco identificado na etapa inicial: a mistura de granularidades.
+Observando os resultados da concessionária Rota do Oeste (CRO) em 2025, o principal padrão identificado foi consistente em toda a análise:
 
-O conjunto consolidado contém **804.335 registros** e mantém a seguinte estrutura:
+> Os veículos comerciais representam 54,60% do volume absoluto de veículos transitados na via da concessionária CRO no período de 2025, sendo os responsáveis por 99,67% dos desgates da via.
 
-| Coluna          | Descrição                                              |
-| --------------- | ------------------------------------------------------ |
-| concessionaria  | Identifica a concessionária responsável pela rodovia   |
-| mes_ano         | Período de referência (padronizado para início do mês) |
-| sentido         | Direção do fluxo                                       |
-| praca           | Praça de pedágio onde o tráfego foi registrado         |
-| tipo_cobranca   | Modalidade de pagamento                                |
-| categoria_eixo  | Número de eixos do veículo (normalizado)               |
-| tipo_de_veiculo | Classificação do veículo                               |
-| volume_total    | Quantidade de veículos                                 |
-| arquivo_origem  | Arquivo de origem do registro                          |
+![alt text](image-2.png)
 
-### Metadado de origem
+Além disso, foi identificado que:
+* Praças como a P2 e a P4 concentram simultaneamente alto volume de tráfego + alto impacto dos veículos (desgate) + significativa participação da praça no fluxo total, resultando em probabilidade de existência de gargalos reais
+* Outras praças, como a P6 e P3, apresentam menor volume em relação as praças anteriores, mas relevante criticidade, sugerindo existência de gargalos ocultos
+* E as demais praças apresentam oportunidade de atuação preventiva
 
-A coluna `arquivo_origem` foi mantida como elemento de rastreabilidade ao longo do pipeline.
+*[Retornar ao sumário](#sumário)*
 
-Ela foi essencial para identificar e corrigir problemas estruturais relevantes, como:
+---
+### Recomendações
 
-- coexistência de arquivos diários e mensais
-- múltiplas versões para o mesmo período (mensal vs consolidado)
-- variações no formato de datas entre anos
+Os resultados obtidos demonstram a necessidade de tomada de algumas decisões como:
+* Priorizar a manutenção da via com base no acompanhamento do índice de gargalo em conjunto com o volume absoluto de veículos
+* Monitorar continuamente a proporção de veículos pesados
+* Expandir o uso de cobrança automática em praças críticas, para melhorar agilidade
+* Antecipar intervenções em praças com criticidade emergente (ações preventivas)
 
-Esse controle permitiu aplicar regras de seleção na ingestão e evitar duplicidades estruturais ainda na camada Bronze.
+*[Retornar ao sumário](#sumário)*
 
-### Estrutura analítica do dataset
+---
+### Impacto Potencial
 
-Com os dados já padronizados, a base permite analisar o sistema sob diferentes dimensões operacionais.
+A adoção dessa abordagem permite realizar uma gestão baseada em pressão operacional, conseguindo com essa análise:
+* Melhorar a alocação de investimento
+* Reduzir o desgate estrutural não previsto (com ações preventivas)
+* Aumentar a eficiência operacional
 
-#### 1. Tráfego (demanda)
+*[Retornar ao sumário](#sumário)*
 
-Representa o volume e sua evolução temporal:
+## 2. Desenvolvimento Técnico
 
-- `volume_total`
-- `mes_ano`
-- `praca`
+### Camada Bronze
+A camada Bronze é a responsável pela ingestão automatizada e padronização estrutural dos dados brutos da ANTT, preservando a fidelidade da fonte e garantindo reprodutibilidade do pipeline.
 
-Permite derivar indicadores como Volume Médio Diário (VMD) e identificar tendências de crescimento ou retração.
+O dataset **“Volume de Tráfego por Praça de Pedágio”** é disponibilizado em múltiplos arquivos CSV, variando por ano e granularidade (diária e mensal). Para garantir consistência analítica, a ingestão foi estruturada com critérios explícitos de seleção.
 
-#### 2. Logística (fluxo direcional)
+---
 
-Captura padrões de deslocamento:
+#### Critérios de ingestão
 
-- `sentido`
-- `praca`
+Foram considerados apenas arquivos:
 
-Permite observar assimetrias de fluxo (ex.: ida vs volta), relevantes para entender dinâmica logística da rodovia.
+- Com granularidade **mensal**
+- Com período a partir de **2016** (para manter um histórico dos últimos 10 anos)
+- Priorizando versões **mensal consolidado** quando disponíveis
 
-#### 3. Impacto na infraestrutura
+Essa decisão evita mistura de granularidades e elimina duplicidade lógica ainda na origem.
 
-Relaciona características do veículo ao desgaste da via:
+---
 
-- `categoria_eixo`
-- `tipo_de_veiculo`
+#### Pipeline de ingestão
 
-A normalização da categoria de eixo possibilita aplicar modelos de desgaste, evidenciando o impacto desproporcional de veículos pesados.
+A ingestão foi implementada em Python utilizando `requests` e `pandas`, seguindo o fluxo:
 
-#### 4. Operação (praça de pedágio)
+1. Consulta à API da ANTT para listagem dos recursos disponíveis  
+2. Normalização dos nomes dos arquivos (remoção de acentos e padronização textual)  
+3. Aplicação dos critérios de seleção  
+4. Registro dos metadados em log de ingestão (rastreabilidade)  
+5. Download automatizado dos arquivos com controle de falhas  
+6. Armazenamento dos dados brutos  
+7. Consolidação dos arquivos em dataset único em formato parquet (garante leitura rápida, compressão alta e análise de dados em escala)
 
-Permite avaliar comportamento operacional:
+---
 
-- `tipo_cobranca`
+#### Transformações aplicadas
 
-Viabiliza análises sobre distribuição entre pagamento manual e automático, além de inferências sobre eficiência e possíveis pontos de fricção.
+Nesta camada, são realizadas apenas transformações estruturais mínimas:
 
-### Qualidade dos dados
+- Padronização do número de colunas  
+- Remoção de cabeçalhos duplicados  
+- Inclusão da coluna `arquivo_origem` para rastreabilidade  
+- Remoção de duplicidades exatas entre arquivos  
 
-A qualidade foi avaliada por meio de diagnósticos automatizados, com geração de evidências na pasta [evidencias](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/evidencias).
+Nenhuma regra de negócio ou agregação é aplicada nesta etapa.
 
-### Principais problemas identificados (e corrigidos)
+---
 
-#### Granularidade inconsistente
+#### Saída da camada Bronze
 
-O principal problema do dataset original era a mistura de:
+A camada Bronze entrega um dataset:
 
-- dados diários
-- dados mensais
-- dados mensais consolidados
+- Consolidado em nível bruto  
+- Com granularidade consistente (dados mensal)  
+- Com rastreabilidade completa da origem  
+- Pronto para tratamento na camada Silver  
 
-Isso gerava duplicidade lógica e inflava os volumes.
+---
 
-**Tratamento aplicado:**
+#### Consideração
 
-- ingestão restrita a dados mensais
-- priorização de versões consolidadas
-- eliminação da necessidade de deduplicação posterior
+O principal papel da Bronze não foi de limpar dados, mas garantir que:
 
-#### Inconsistência de datas
+> todos os dados relevantes foram corretamente capturados, preservados e organizados de forma reprodutível.
 
-Foram identificados múltiplos formatos:
+*[Retornar ao sumário](#sumário)*
 
-- `DD/MM/AAAA`
-- `MM/AAAA`
-- formatos textuais (ex.: `jan/2026`)
+---
 
-**Tratamento aplicado:**
+Aqui você já está muito perto de um nível sênior — o ajuste agora é **organização mental + precisão de linguagem**.
 
-- padronização para datetime
-- conversão para início do mês (`YYYY-MM-01`)
+Eu vou te devolver no mesmo padrão da Bronze: mais enxuto, mais estruturado e com **cara de decisão consciente (não só execução)**.
 
-#### Inconsistência categórica
+---
 
-A coluna `tipo_de_veiculo` apresentava variações semânticas:
+### Camada Silver
 
-```
-PASSEIO
-Passeio
-VEÍCULO PEQUENO
-COMERCIAL
-Comercial
-```
+A camada Silver é responsável por transformar os dados da Bronze em uma base consistente, padronizada e analiticamente confiável.
 
-**Tratamento aplicado:**
+Nesta etapa, o foco deixa de ser ingestão e passa a ser qualidade e integridade dos dados, garantindo que cada registro represente uma observação única do sistema.
 
-- padronização textual (upper + trim)
-- unificação de categorias equivalentes
+Objetivos da camada:
 
-#### Inconsistência estrutural
+- Eliminar inconsistências estruturais e semânticas  
+- Padronizar formatos (texto, números e datas)  
+- Resolver conflitos de duplicidade lógica  
+- Garantir unicidade no nível de análise  
 
-A coluna `categoria_eixo` apresentava mistura de formatos (texto e numérico).
+---
 
-**Tratamento aplicado:**
+#### Padronização de dados
 
-- extração de valores numéricos
-- conversão para tipo numérico
+**Texto (categorias):**
 
-#### Inconsistência numérica
+As colunas categóricas foram normalizadas para evitar duplicidade lógica:
 
-A coluna `volume_total` estava em formato textual com padrão brasileiro:
-
-```
-277638,00
-```
-
-**Tratamento aplicado:**
-
-- remoção de separadores
-- conversão para tipo numérico
-
-### Resultado da limpeza
-
-Após os tratamentos:
-
-- **0 registros inválidos** (dados essenciais preservados)
-- **0 duplicidades estruturais** no nível de análise
-- granularidade consistente (mensal)
-- tipagem adequada para cálculo
-
-
-### Conclusão
-
-A etapa de exploração revelou que os principais problemas do dataset não estavam na ausência de dados, mas na falta de padronização e consistência estrutural.
-
-Ao corrigir esses pontos ainda no pipeline, foi possível transformar uma base potencialmente inconsistente em um dataset confiável, adequado para construção de indicadores operacionais e análises estratégicas.
-
-Com isso, o tráfego passa a ser analisado de forma consistente ao longo do tempo, permitindo interpretar não apenas volume, mas também comportamento, impacto e concentração dentro da concessão.
-
-## Camada Silver (Tratamento e Padronização)
-
-A camada Silver tem como objetivo transformar os dados já filtrados na Bronze, **restritos à granularidade mensal**, em uma base consistente, padronizada e pronta para modelagem analítica.
-
-Diferente da etapa anterior, aqui o foco não é mais selecionar dados, mas **corrigir inconsistências estruturais e semânticas**, garantindo que cada registro represente corretamente uma observação única do sistema.
-
-### Padronização de texto
-
-As colunas categóricas passaram por normalização para eliminar variações de formatação que poderiam gerar duplicidade lógica:
-
-- remoção de espaços em branco
-- conversão para letras maiúsculas
-- padronização de valores equivalentes
+- Remoção de espaços em branco  
+- Conversão para letras maiúsculas  
+- Unificação de valores equivalentes  
 
 Exemplo:
 
@@ -247,248 +226,249 @@ VEÍCULO PEQUENO → PASSEIO
 VEICULO PEQUENO → PASSEIO
 ```
 
-Esse tratamento garante consistência nas análises segmentadas, evitando que a mesma categoria seja interpretada como múltiplos grupos distintos.
+---
 
-### Tratamento numérico
+**Numérico:**
 
-A coluna `volume_total`, originalmente armazenada como texto com formatação brasileira, foi convertida para tipo numérico, permitindo seu uso em cálculos.
+* `volume_total` convertido de texto (formato brasileiro) para numérico
+* `categoria_eixo` transformada para tipo numérico com extração de valores
 
-Além disso, a coluna `categoria_eixo` passou por extração de valores numéricos, removendo inconsistências como textos misturados com números.
+Isso garante consistência em agregações e métricas derivadas.
 
-Esse processo garante que ambas as colunas possam ser utilizadas corretamente em agregações e métricas derivadas.
+---
 
-### Padronização temporal
+**Temporal:**
 
-A coluna `mes_ano` apresentava múltiplos formatos, mesmo após o filtro mensal na Bronze, incluindo:
+A coluna `mes_ano` apresentava múltiplos formatos.
 
-- datas completas (`DD/MM/AAAA`)
-- representações reduzidas (`MM/AAAA`)
+Tratamento aplicado:
 
-Para garantir consistência temporal:
+* conversão para `datetime`
+* padronização para o primeiro dia do mês (`YYYY-MM-01`)
 
-- todos os formatos foram convertidos para `datetime`
-- os valores foram padronizados para o **primeiro dia do mês** (`YYYY-MM-01`)
+Essa abordagem assegura consistência em análises temporais e integração com dimensões de tempo.
 
-Essa padronização permite agregações corretas e integração direta com dimensões de tempo na camada analítica.
+---
 
-### Resolução de conflitos de granularidade
+#### Resolução de conflitos de dados
 
-Mesmo após a remoção de dados diários na Bronze, foram identificados casos em que múltiplos registros apresentavam:
+Foram identificados casos em que múltiplos registros representavam a mesma observação, mas com valores diferentes de volume.
 
-```text
-mesma chave analítica, mas valores diferentes de volume
-```
+**Chave analítica considerada:**
 
-A chave considerada foi:
+* concessionária
+* mes_ano
+* praça
+* tipo de veículo
+* categoria de eixo
+* sentido
+* tipo de cobrança
 
-- concessionária
-- período (`mes_ano`)
-- praça
-- tipo de veículo
-- categoria de eixo
-- sentido
-- tipo de cobrança
+**Estratégia adotada:**
 
-Esses conflitos indicam múltiplas versões de dados para a mesma observação (ex.: reprocessamentos ou inconsistências na origem).
+* Identificação de conflitos por chave
+* Consolidação utilizando o valor máximo de `volume_total`
 
-**Tratamento aplicado:**
+Essa decisão evita subestimação do tráfego e mantém consistência sem inflar os dados.
 
-- identificação dos grupos conflitantes
-- consolidação utilizando o valor **máximo de volume_total**
+---
 
-Essa decisão evita subestimação do tráfego e garante consistência sem inflar os valores (como ocorreria com soma).
+#### Consolidação e validação
 
-### Consolidação e unicidade
+Após o tratamento:
 
-Após a resolução de conflitos, os dados foram:
+* Dados foram agregados no nível da chave analítica
+* As duplicidades foram removidas
+* E a unicidade foi garantida
 
-- agregados no nível da chave analítica
-- deduplicados
-- validados para garantir unicidade
+Cada linha do dataset passa a representar uma observação única e consistente.
 
-Ao final do processo:
+---
 
-- não há duplicidades no nível de análise
-- cada linha representa uma observação única e consistente
+#### Remoção de registros inválidos
 
-### Remoção de registros inválidos
+Foram excluídos registros que não atendiam critérios mínimos como:
 
-Foram removidos registros que não atendiam aos critérios mínimos de qualidade:
+* Datas não convertidas
+* Volumes nulos ou inválidos
 
-- datas não convertidas
-- volumes nulos ou inválidos
+---
 
-Esse passo garante integridade dos dados sem comprometer a representatividade do dataset.
-
-### Resultado da camada Silver
+#### Saída da camada Silver
 
 A camada Silver entrega um dataset:
 
-- consistente em granularidade (mensal)
-- padronizado em categorias e tipos de dados
-- livre de duplicidades estruturais
-- confiável para construção de métricas
+* Consistente em granularidade (mensal)
+* Padronizado em formatos e categorias
+* Livre de duplicidades estruturais
+* Pronto para modelagem analítica
 
-O resultado final é salvo em:
+Arquivo gerado na camada Silver:
 
 [silver/antt_trafego_silver.parquet](https://github.com/elisamanuelle/antt_analise_trafego/blob/main/silver)
 
-### Consideração final
 
-O principal ganho desta etapa não está apenas na limpeza dos dados, mas na garantia de consistência analítica.
+---
 
-Ao resolver conflitos, padronizar formatos e assegurar unicidade, a camada Silver elimina ambiguidades que poderiam distorcer indicadores, permitindo que as análises da camada Gold reflitam o comportamento real do tráfego, e não inconsistências da fonte.
+#### Consideração
 
-## Camada Gold (Modelo Analítico)
+O valor da camada Silver não está apenas na limpeza, mas na garantia de consistência analítica.
 
-A camada Gold tem como objetivo transformar os dados tratados na Silver em um modelo analítico estruturado, orientado ao consumo em ferramentas de BI e à geração de indicadores de negócio.
+Ao padronizar formatos e resolver conflitos de dados, esta etapa elimina ambiguidades que poderiam distorcer indicadores, assegurando que a camada Gold reflita o comportamento real do sistema.
 
-Nesta etapa, o foco deixa de ser limpeza e passa a ser modelagem, garantindo que os dados possam ser explorados de forma eficiente, consistente e com significado operacional.
+*[Retornar ao sumário](#sumário)*
 
-### Modelagem dimensional
+---
 
-Foi adotado um modelo estrela, separando claramente:
+### Camada Gold
 
-- **fatos** → onde estão as métricas
-- **dimensões** → que dão contexto às análises
+A camada Gold é a responsável por transformar os dados tratados na Silver em um modelo analítico estruturado, orientado à geração de indicadores de negócio e consumo em ferramentas de BI.
 
-Essa abordagem reduz redundância, melhora performance e facilita a construção de medidas no Power BI.
+Nesta etapa, o foco deixa de ser tratamento e passa a ser modelagem e significado analítico, garantindo que os dados possam ser explorados de forma consistente, performática e alinhada ao problema de negócio.
 
-### Tabela fato Tráfego
+Objetivo da camada:
 
-A tabela `fato_trafego` representa o núcleo analítico do modelo.
+- Estruturar os dados para análise multidimensional  
+- Garantir consistência de granularidade  
+- Viabilizar construção de indicadores operacionais  
+- Suportar consumo direto em BI (Power BI)  
 
-Ela foi construída a partir da agregação da Silver no seguinte grão:
+---
 
-- mês
-- praça
-- concessionária
-- tipo de veículo
-- categoria de eixo
+#### Modelagem dimensional
 
-Esse nível garante consistência com a granularidade mensal já tratada anteriormente e evita dupla contagem.
+Foi adotado o modelo estrela, separando:
 
-### Métricas derivadas
+- **Fatos**: métricas  
+- **Dimensões**: contexto analítico  
 
-A partir dessa base, foram construídos indicadores fundamentais para análise:
+Essa abordagem reduz redundância, melhora performance e simplifica a construção de medidas.
 
-#### Volume Total
+---
 
-Representa o total de veículos no período e serve como base para todos os cálculos.
+#### Fatos
 
-#### VMD (Volume Médio Diário)
+``fato_trafego``
+
+Tabela central do modelo, representando o volume de veículos.
+
+**Nível de detalhamento:**
+
+- mês  
+- praça  
+- concessionária  
+- tipo de veículo  
+- categoria de eixo  
+
+Esse nível garante alinhamento com a granularidade mensal da Silver e evita dupla contagem.
+
+---
+
+``fato_operacional``
+
+Tabela complementar com foco em comportamento operacional.
+
+**Nível de detalhamento:**
+
+- mês  
+- praça  
+- tipo de cobrança  
+- sentido  
+
+Permite análises específicas de operação, sem misturar granularidades com a fato de tráfego.
+
+---
+
+#### Métricas derivadas
+
+As métricas foram construídas diretamente no modelo para traduzir o comportamento do sistema.
+
+**Volume Total**
+
+Base de todas as análises:
+
+```text
+Volume Total = soma de veículos no período
+````
+
+---
+
+**VMD (Volume Médio Diário)**
 
 ```text
 VMD = volume_total / dias_mes
 ```
 
-Permite comparar meses com diferentes quantidades de dias e traduz o fluxo para uma escala operacional diária.
+Normaliza o volume para uma escala diária, permitindo comparações entre períodos.
 
-#### Fator de Desgaste
+---
 
-Baseado na categoria de eixo:
+**Fator de Desgaste**
 
 ```text
 fator_desgaste = eixo^4
 ```
 
-Esse cálculo segue o princípio da **Lei da Quarta Potência**, amplamente utilizada na engenharia rodoviária, segundo a qual o dano ao pavimento cresce de forma exponencial com o aumento da carga.
+Baseado na Lei da Quarta Potência, esse indicador estima o impacto estrutural dos veículos.
 
-Como o dataset não possui peso por eixo, a `categoria_eixo` foi utilizada como proxy de carga. Valores nulos ou zero foram tratados como 1, assumindo impacto mínimo equivalente a veículos leves.
+Como não há peso por eixo no dataset, a categoria de eixo foi utilizada como proxy de carga.
+Valores nulos ou zero foram tratados como 1 (impacto mínimo).
 
-Esse indicador permite capturar um ponto essencial:
+---
+
+**Participação da Praça**
 
 ```text
-poucos veículos pesados podem gerar a maior parte do desgaste
+participacao = volume_praca / volume_total_mes
 ```
 
-#### Participação da Praça
+Permite analisar concentração de fluxo e relevância operacional das praças.
+
+---
+
+#### Dimensões
+
+As dimensões fornecem contexto analítico ao modelo.
+
+* **dim_tempo**: ano, mês, trimestre, ordenação temporal
+* **dim_praca**: identificação das praças
+* **dim_concessionaria**: segmentação por operador
+* **dim_veiculo**: tipo + categoria de eixo
+
+Classificação derivada:
 
 ```text
-volume_praca / volume_total_do_mes
-```
-
-Calculada dentro do contexto de cada mês, essa métrica permite analisar concentração de fluxo e identificar praças com maior relevância operacional.
-
-### Tabela fato Operacional
-
-Além da visão de tráfego, foi criada uma segunda fato (`fato_operacional`) com foco em comportamento operacional, agregando por:
-
-- mês
-- praça
-- tipo de cobrança
-- sentido
-
-Essa separação evita misturar granularidades analíticas diferentes e permite análises específicas sobre operação (ex.: distribuição de cobrança e fluxo direcional).
-
-### Dimensões
-
-As dimensões foram estruturadas para enriquecer o contexto analítico:
-
-#### Tempo (`dim_tempo`)
-
-Inclui atributos como:
-
-- ano
-- mês
-- nome do mês
-- trimestre
-- chave ordenável
-
-Permite análises temporais consistentes e ordenação correta nos visuais.
-
-#### Praça (`dim_praca`)
-
-Identifica as praças de pedágio, permitindo análise espacial do fluxo.
-
-#### Concessionária (`dim_concessionaria`)
-
-Permite segmentar análises por operador, viabilizando comparações.
-
-#### Veículo (`dim_veiculo`)
-
-Combina:
-
-- tipo de veículo
-- categoria de eixo
-
-Além disso, inclui classificação derivada:
-
-```text
-COMERCIAL → PESADO
+COMERCIAL → PESADO  
 outros → LEVE
 ```
 
-Essa dimensão é fundamental para análises de impacto estrutural.
+* **dim_cobranca**: tipo de pagamento
+* **dim_sentido**: direção do fluxo
 
-#### Cobrança (`dim_cobranca`)
+---
 
-Representa os tipos de pagamento, permitindo análises operacionais.
+#### Chaves e integridade
 
-#### Sentido (`dim_sentido`)
+As tabelas são conectadas pelas chaves:
 
-Permite analisar o fluxo direcional da rodovia.
+* `id_tempo`
+* `id_praca`
+* `id_concessionaria`
+* `id_veiculo`
+* `id_cobranca`
+* `id_sentido`
 
-### Chaves e integridade
+Essa estrutura garante:
 
-As tabelas foram conectadas por chaves consistentes:
+* Integridade referencial
+* Ausência de ambiguidade
+* Compatibilidade com modelo estrela
 
-- `id_tempo`
-- `id_praca`
-- `id_concessionaria`
-- `id_veiculo`
-- `id_cobranca`
-- `id_sentido`
+---
 
-A construção das chaves garante:
+#### Estrutura de saída
 
-- integridade referencial
-- ausência de ambiguidade
-- compatibilidade com modelo estrela
-
-### Resultado final
-
-Os dados são disponibilizados na camada Gold em formato parquet:
+Os dados são disponibilizados em formato parquet:
 
 ```
 gold/
@@ -502,41 +482,58 @@ gold/
 ├─ dim_sentido.parquet
 ```
 
-### Consideração final
+---
 
-A camada Gold não apenas organiza os dados, ela define como o problema será analisado.
+#### Consideração
 
-Ao estruturar o modelo em torno de volume, desgaste e concentração, o projeto deixa de ser apenas descritivo e passa a capturar a dinâmica real da rodovia, permitindo identificar:
+A camada Gold define como o problema será analisado.
 
-- intensidade de uso
-- impacto na infraestrutura
-- pontos de maior pressão operacional
+Ao estruturar o modelo em torno de volume, desgaste e concentração, os dados deixam de ser apenas descritivos e passam a representar a dinâmica operacional da rodovia.
 
-Com isso, os dados se tornam diretamente utilizáveis para tomada de decisão, sem necessidade de tratamentos adicionais no consumo.
+Isso permite:
 
-## Indicadores
+* Identificar intensidade de uso da via
+* Medir impacto na infraestrutura
+* Priorizar praças de maior pressão
 
-Após a reconstrução do modelo e das pipelines, todas as medidas do painel foram revisadas com foco em **consistência de contexto, comparabilidade e significado operacional**.
+Sem necessidade de transformações adicionais no consumo.
 
-Os indicadores foram organizados em três blocos principais: **volume**, **desgaste** e **criticidade**, permitindo interpretar o sistema de forma integrada.
 
-### Volume e distribuição de tráfego
+*[Retornar ao sumário](#sumário)*
 
-A base de todas as análises é o volume de veículos.
+---
+
+### Indicadores
+
+Os indicadores foram estruturados para garantir consistência de contexto, comparabilidade e interpretação operacional.
+
+A lógica analítica segue três pilares:
+
+- **Volume:** intensidade de uso  
+- **Desgaste:** impacto estrutural  
+- **Criticidade:** priorização operacional  
+
+---
+
+#### 1. Volume (base analítica)
+
+O volume é a base de todas as análises.
 
 ```DAX
 Volume Total = SUM(fato_trafego[volume_total])
 ```
 
-A partir dele, derivam-se métricas de participação e segmentação:
+A partir dele, derivam-se métricas de distribuição:
 
-- **% Volume** → distribuição do tráfego por tipo de veículo
-- **% Fluxo Praça** → participação de cada praça no fluxo total
-- **% Cobrança** → distribuição por tipo de pagamento
+* **% Volume**: participação por tipo de veículo
+* **% Fluxo Praça**: participação da praça no fluxo total
+* **% Cobrança**: distribuição por tipo de pagamento
 
-Essas medidas utilizam `ALLSELECTED`, garantindo que os percentuais sejam calculados **dentro do contexto do filtro ativo (ano, concessionária, etc.)**, evitando distorções.
+Essas medidas utilizam `ALLSELECTED`, garantindo que os percentuais sejam calculados dentro do contexto filtrado na página.
 
-### Volume Médio Diário (VMD)
+---
+
+#### Volume Médio Diário (VMD)
 
 ```DAX
 VMD_ =
@@ -549,23 +546,27 @@ DIVIDE(
 )
 ```
 
-O VMD traduz o volume mensal para uma escala diária, permitindo comparar períodos com diferentes quantidades de dias.
+O VMD normaliza o volume mensal para escala diária, permitindo comparações entre períodos.
 
-Diferente de uma simples divisão, o cálculo considera corretamente o contexto temporal filtrado, evitando erros em agregações multi-mês.
+O cálculo considera corretamente o contexto temporal, evitando distorções em agregações multi-mês.
 
-### Segmentação por tipo de veículo
+---
 
-Foram criadas medidas específicas para entender o papel dos veículos pesados:
+#### Segmentação por veículo
 
-- **Volume Pesado**
-- **% Pesados**
-- **% Volume Comercial**
+Indicadores específicos foram criados para analisar o papel dos veículos pesados:
 
-Essas métricas permitem identificar o quanto da demanda está associada a transporte de carga.
+* **Volume Pesado**
+* **% Pesados**
+* **% Volume Comercial**
 
-### Desgaste da via
+Essas métricas permitem entender a composição do tráfego.
 
-O desgaste é um dos pilares analíticos do projeto.
+---
+
+#### 2. Desgaste (impacto estrutural)
+
+O desgaste captura o impacto real sobre a infraestrutura.
 
 ```DAX
 Desgaste Total =
@@ -575,35 +576,39 @@ SUMX(
 )
 ```
 
-Esse cálculo incorpora o fator de desgaste (baseado na Lei da Quarta Potência), permitindo capturar o impacto não linear dos veículos pesados.
+Esse cálculo incorpora o fator de desgaste (Lei da Quarta Potência), refletindo o impacto não linear dos veículos pesados.
 
-A partir disso, derivam-se:
+A partir dele, derivam-se:
 
-- **Desgaste Pesado** → impacto gerado apenas por veículos pesados
-- **% Desgaste** → distribuição do desgaste por tipo de veículo
-- **% Desgaste Praça** → concentração do impacto por praça
+* **Desgaste Pesado**
+* **% Desgaste**
+* **% Desgaste Praça**
 
-### Relação entre volume e desgaste
+---
 
-Um dos pontos centrais do projeto é comparar:
+#### Relação Volume vs Desgaste
+
+Um dos principais insights do modelo é a comparação entre:
 
 ```text
-quanto um grupo representa no volume vs quanto ele representa no desgaste
+participação no volume vs participação no desgaste
 ```
 
-Exemplo:
+Essa relação evidencia distorções estruturais, como:
+
+```text
+veículos comerciais representam médio volume, mas maior impacto
+```
+
+Essa leitura é sintetizada na medida:
 
 ```DAX
 Insight Comercial
 ```
 
-Essa medida traduz automaticamente o desequilíbrio entre volume e impacto, evidenciando que:
+---
 
-```text
-veículos comerciais tendem a representar menos volume, mas maior desgaste
-```
-
-### Eixo médio ponderado
+#### Eixo médio ponderado
 
 ```DAX
 Eixo Médio Ponderado =
@@ -613,11 +618,17 @@ DIVIDE(
 )
 ```
 
-Esse indicador sintetiza o “peso médio” da frota, funcionando como proxy da carga média circulante na rodovia.
+Representa a carga média da frota, funcionando como proxy do nível de impacto estrutural.
 
-### Índice de Gargalo (criticidade operacional)
+---
 
-O principal indicador do projeto é o índice de gargalo.
+#### 3. Criticidade (priorização operacional)
+
+A criticidade consolida volume, desgaste e concentração em um único indicador.
+
+---
+
+**Índice de Gargalo**
 
 ```DAX
 Indice Gargalo =
@@ -631,19 +642,21 @@ RETURN
     [Volume Total] * PesoDesgaste * Concentracao
 ```
 
-Esse índice combina três fatores:
+Esse índice combina:
 
-- **volume** → intensidade de uso
-- **desgaste médio** → impacto estrutural
-- **concentração** → relevância da praça no sistema
+* volume: intensidade
+* desgaste médio: impacto
+* concentração: relevância
 
-Na prática, ele identifica:
+Na prática, identifica:
 
 ```text
 onde há mais fluxo + mais impacto + mais concentração
 ```
 
-### Normalização do índice
+---
+
+**Normalização**
 
 ```DAX
 Indice Gargalo Normalizado =
@@ -658,255 +671,200 @@ DIVIDE(
 )
 ```
 
-A normalização transforma o índice em uma escala relativa (0 a 1), permitindo comparar praças dentro do contexto filtrado.
+A normalização permite comparar praças dentro do contexto filtrado (escala relativa).
 
-O uso de `ALLSELECTED` garante que a comparação seja feita **apenas dentro do recorte atual**, evitando distorções globais.
+---
 
-### Classificação de criticidade
+**Classificação de criticidade**
 
 ```DAX
 Categoria Gargalo
 ```
 
-As praças são classificadas em três níveis:
+As praças são classificadas em:
 
-- **Alta Pressão**
-- **Atenção**
-- **Baixa Pressão**
+* Alta Pressão
+* Atenção
+* Baixa Pressão
 
-Essa categorização simplifica a interpretação e transforma o indicador em um instrumento direto de decisão.
+---
 
-### Ordenação e priorização
+**Ordenação**
 
 ```DAX
 Ordem Gargalo
 ```
 
-Permite ordenar visualmente as praças por criticidade, facilitando a identificação dos principais pontos de atenção.
+Permite priorização visual das praças por nível de criticidade.
 
-### Consideração final
+---
 
-O conjunto de indicadores foi desenhado para responder não apenas “quanto passa”, mas principalmente:
+#### Consideração
+
+Os indicadores foram desenhados para responder não apenas:
+
+* Quanto passa?
+
+Mas principalmente:
+* Onde o sistema está mais pressionado?
+
+
+Ao integrar volume, desgaste e concentração, o modelo transforma dados de tráfego em um instrumento direto de priorização operacional.
+
+*[Retornar ao sumário](#sumário)* 
+
+---
+
+### Visualizações
+
+O dashboard foi estruturado para traduzir os indicadores em uma leitura progressiva do sistema, guiando o usuário por três perguntas:
 
 ```text
-onde o sistema está mais pressionado
+Quanto passa? → Quem impacta? → Onde está o problema?
+````
+
+O objetivo não é apenas exibir dados, mas reduzir a carga cognitiva e permitir interpretação rápida, mesmo sem conhecimento prévio do modelo.
+
+---
+
+#### 1. Visão geral (KPIs)
+
+O topo do painel apresenta os principais indicadores sintéticos:
+
+* **Volume Médio Diário (VMD)**
+* **Volume Total**
+* **% de Veículos Pesados**
+* **% de Desgaste gerado por Pesados**
+
+Essa combinação permite leitura imediata do sistema:
+
+* O VMD traduz o ritmo operacional diário
+* O volume total indica escala de tráfego
+* A comparação entre % pesados e % desgaste evidencia o impacto desproporcional dos veículos comerciais
+
+---
+
+#### Insight automático
+
+Um destaque textual sintetiza o principal insight do período:
+
+```text id="3bxtqf"
+Veículos comerciais representam X% do volume, mas Y% do desgaste da via
 ```
 
-Ao combinar volume, desgaste e concentração, o modelo permite identificar pontos críticos da operação de forma objetiva, transformando dados de tráfego em um instrumento de priorização operacional.
+Esse elemento elimina interpretação manual e direciona o foco do usuário para o principal desequilíbrio do sistema.
 
+---
 
-## Visualizações
+#### 2. Composição do tráfego (quem impacta)
 
-O dashboard foi estruturado para traduzir os indicadores em uma leitura direta do comportamento operacional da rodovia, organizando as informações em blocos que respondem, de forma progressiva:
+**Volume vs Desgaste por tipo de veículo**
 
-```text
-quanto passa → quem impacta → onde está o problema
+Gráfico de colunas comparando:
+
+* **% Volume**
+* **% Desgaste**
+
+por tipo de veículo.
+
+Essa visualização evidencia que:
+
+```text id="qv6c6g"
+veículos comerciais concentram a maior parte do impacto estrutural, mesmo sem representar todo o volume
 ```
 
-### Visão geral (KPIs)
+---
 
-No topo do painel, são apresentados os principais indicadores sintéticos:
+**Distribuição por tipo de cobrança**
 
-- **Volume Médio Diário (VMD)**
-- **Volume Total**
-- **% de Veículos Pesados**
-- **% de Desgaste gerado por Pesados**
+Gráfico de rosca mostrando a participação de:
 
-Essa combinação permite uma leitura imediata do sistema:
+* Cobrança automática
+* Manual
+* OCR/placa
 
-- o **VMD** traduz o ritmo diário da rodovia
-- o **Volume Total** indica a escala do tráfego
-- a comparação entre **% Pesados vs % Desgaste** evidencia o impacto desproporcional dos veículos comerciais
+Permite avaliar o nível de automação e possíveis pontos de fricção operacional.
 
-### Insight automático
+---
 
-Logo abaixo, um destaque textual sintetiza o principal insight do período:
+#### 3. Dinâmica temporal (como o sistema evolui)
 
-```text
-Veículos comerciais representam X% do volume, mas Y% do desgaste da via.
+**Evolução do VMD**
+
+Gráfico de linha com o VMD ao longo do tempo.
+
+Permite identificar:
+
+* Tendências de crescimento ou retração
+* Padrões sazonais
+* Variações operacionais
+
+---
+
+#### 4. Análise espacial (onde está o problema)
+
+**Volume Total por praça**
+
+Gráfico de barras comparando o volume entre praças.
+
+Permite identificar concentração de tráfego no sistema.
+
+---
+
+**Tabela de criticidade operacional**
+
+Tabela consolidando:
+
+* **% de criticidade**
+* **categoria de gargalo** (Alta Pressão, Atenção, Baixa Pressão)
+
+Funciona como resumo operacional, permitindo identificar rapidamente:
+
+```text id="g6a2h6"
+Quais praças concentram maior pressão no sistema
 ```
 
-Essa frase elimina a necessidade de interpretação manual e evidencia diretamente o desequilíbrio entre demanda e impacto estrutural.
+---
 
-### Volume vs Desgaste por tipo de veículo
+**Interpretação do gargalo**
 
-O gráfico de colunas compara:
+Bloco explicativo para suporte à leitura:
 
-- **% Volume**
-- **% Desgaste**
-
-por tipo de veículo (comercial, passeio e moto).
-
-Essa visualização é central para o entendimento do modelo, pois demonstra que:
-
-```text
-veículos comerciais concentram a maior parte do desgaste, mesmo sem representar todo o volume
-```
-
-### Evolução do VMD ao longo do tempo
-
-O gráfico de linha apresenta o VMD por mês, permitindo identificar:
-
-- tendências de crescimento ou queda
-- possíveis padrões sazonais
-- variações operacionais ao longo do ano
-
-Essa visão temporal complementa a análise estática dos KPIs.
-
-### Distribuição por tipo de cobrança
-
-O gráfico de rosca mostra a participação dos diferentes tipos de cobrança:
-
-- automática
-- manual
-- OCR/placa
-
-Essa visualização permite avaliar o nível de automação da operação e possíveis impactos na fluidez do tráfego.
-
-### Índice de Gargalo por praça
-
-O gráfico de barras apresenta o **Índice de Gargalo Normalizado**, permitindo comparar diretamente as praças dentro do contexto selecionado.
-
-A normalização transforma o indicador em uma escala relativa (0 a 100%), facilitando a leitura e o ranking.
-
-### Tabela de criticidade operacional
-
-A tabela consolida a análise por praça, apresentando:
-
-- **% de criticidade**
-- **categoria de gargalo** (Alta Pressão, Atenção, Baixa Pressão)
-
-Essa visualização funciona como um resumo operacional, permitindo identificar rapidamente:
-
-```text
-quais praças concentram maior pressão no sistema
-```
-
-### Interpretação do gargalo
-
-Ao lado da tabela, um bloco explicativo orienta a leitura do indicador:
-
-```text
+```text id="7fchx1"
 Criticidade operacional combina:
-• volume de tráfego
-• impacto dos veículos (desgaste)
+• volume de tráfego  
+• impacto dos veículos (desgaste)  
 • participação da praça no fluxo total
 ```
 
-Esse apoio conceitual garante que o usuário compreenda o significado do indicador sem necessidade de conhecer sua formulação técnica.
+Esse elemento garante compreensão do indicador sem necessidade de conhecimento técnico.
 
-### Consideração final
+---
 
-As visualizações foram desenhadas para reduzir a carga cognitiva e priorizar interpretação rápida.
+#### Consideração
 
-O painel não exige conhecimento prévio do modelo, permitindo que qualquer usuário entenda:
+As visualizações foram desenhadas para transformar dados em diagnóstico operacional.
 
-- o nível de tráfego
-- o impacto estrutural dos veículos
-- e, principalmente, onde estão os pontos críticos da operação
+O painel permite que qualquer usuário entenda:
 
-Com isso, o dashboard deixa de ser apenas descritivo e passa a atuar como um instrumento de diagnóstico operacional.
+* O nível de tráfego
+* O impacto estrutural
+* E os pontos críticos da operação
 
-## Insights
+Sem necessidade de tratamento adicional ou conhecimento prévio do modelo.
 
-### Cenário geral: CRO em 2025
 
-<img width="1480" height="830" alt="image" src="https://github.com/user-attachments/assets/d3785a40-e4f2-40bf-8902-28dbf89649cf" />
 
-Na visão consolidada da concessionária, o tráfego apresenta um volume elevado (30,2 milhões de veículos no ano) com um VMD de aproximadamente 82 mil veículos/dia. À primeira vista, isso poderia sugerir que o principal desafio é capacidade de fluxo. Mas o dado mais relevante está na composição:
-- 54,60% do volume é comercial
-- 99,67% do desgaste vem desses veículos
+*[Retornar ao sumário](#sumário)* 
 
-Isso muda completamente a leitura do problema. O sistema não está pressionado apenas por quantidade, mas principalmente por tipo de carga circulante. O desgaste da rodovia é praticamente monopolizado por veículos pesados, o que indica que qualquer aumento marginal nesse grupo tem impacto desproporcional na infraestrutura.
+---
 
-Outro ponto importante é a distribuição de cobrança, com predominância de meios automáticos, mas ainda com participação relevante de cobrança manual. Isso sugere espaço para ganho operacional, especialmente em momentos de pico.
-
-### Primeiro cenário: Praça P2 (Alta Pressão)
-
-<img width="1478" height="828" alt="image" src="https://github.com/user-attachments/assets/669f5cae-099d-41f5-a445-a407736ef04a" />
-
-Ao isolar a praça P2, o padrão estrutural se mantém, mas com intensificação do problema:
-- VMD: 14.247
-- Volume anual: 5,2 milhões
-- Criticidade: 100% (máximo do modelo)
-
-Aqui, a praça se posiciona como o principal gargalo da operação. O volume é alto, mas o fator crítico continua sendo a composição: mais da metade do tráfego é comercial e praticamente todo o desgaste vem desse grupo.
-
-O ponto mais relevante é que a P2 não é apenas movimentada, ela é estrategicamente carregada, provavelmente associada a rotas logísticas importantes.
-
-**Insight acionável:**
-A P2 deve ser tratada como prioridade operacional. Possíveis ações incluem:
-- aumento de capacidade (faixas, cabines, automação)
-- monitoramento contínuo de fluxo pesado
-- planejamento de manutenção preventiva mais frequente
-
-### Segundo cenário: Praça P4 (Alta Pressão)
-
-<img width="1479" height="830" alt="image" src="https://github.com/user-attachments/assets/da966d1c-4f90-4d42-8009-1124db502195" />
-
-A praça P4 também aparece como crítica, mas com um comportamento ligeiramente diferente:
-- VMD: 13.283
-- Volume anual: 4,8 milhões
-- Criticidade: 77,95% (ainda alta)
-
-Embora o volume seja um pouco menor que o da P2, a P4 mantém um nível elevado de pressão operacional. Isso indica que o gargalo aqui não depende apenas de volume absoluto, mas da relação entre fluxo, desgaste e concentração.
-
-A distribuição de cobrança mostra uma leve diferença, com maior participação de meios manuais em relação ao cenário geral. Isso pode contribuir para fricções operacionais.
-
-**Insight acionável:**
-Na P4, além da questão estrutural, existe um componente operacional relevante. A melhoria aqui pode vir de:
-- incentivo ao uso de cobrança automática
-- redistribuição de fluxo entre cabines
-- ajustes operacionais antes de investimentos estruturais
-
-### Terceiro cenário: Praça P6 (Transição para Alta Pressão)
-
-<img width="1480" height="829" alt="image" src="https://github.com/user-attachments/assets/de4fe980-efa7-44d7-af88-589df676d6fa" />
-
-A praça P6 apresenta um cenário interessante de transição:
-- VMD: 9.363
-- Volume anual: 3,4 milhões
-- Criticidade: 53,09% (limite entre atenção e alta pressão)
-
-Aqui, o volume é menor, mas a composição do tráfego mantém o padrão crítico: predominância de veículos comerciais e alto impacto no desgaste.
-
-O que diferencia a P6 é que ela ainda não atingiu o nível máximo de pressão, mas está claramente no caminho. É um caso clássico de gargalo emergente.
-
-**Insight acionável:**
-A P6 é o melhor ponto para atuação preventiva:
-- antecipar melhorias antes de virar gargalo crítico
-- monitorar evolução do fluxo pesado
-- testar intervenções operacionais com menor custo
-
-### Conclusão estratégica
-
-Os cenários mostram um padrão consistente: o problema não é apenas quanto passa, mas o que passa e onde passa.
-
-- P2 → gargalo consolidado (agir imediatamente)
-- P4 → gargalo estrutural + operacional (otimizar + ajustar)
-- P6 → gargalo emergente (prevenir antes de escalar)
-
-A combinação entre volume, composição e concentração permite priorizar ações com mais precisão, saindo de uma gestão reativa para uma abordagem orientada por dados.
-
-## Implicações de Negócio
-
-Os resultados indicam que o volume de tráfego, isoladamente, não é um bom indicador de impacto operacional. Praças com menor volume podem apresentar maior criticidade quando há concentração de veículos pesados.
-
-Isso implica que decisões baseadas apenas em fluxo total podem levar a alocação ineficiente de recursos, especialmente em manutenção de pavimento e gestão operacional.
-
-## Recomendações
-
-Com base nos resultados, recomenda-se:
-
-- Priorizar manutenção preventiva nas praças com maior índice de gargalo, especialmente aquelas com alta concentração de veículos pesados.
-- Monitorar continuamente a composição do tráfego (leve vs pesado), pois o impacto estrutural não cresce de forma linear.
-- Avaliar a distribuição entre tipos de cobrança nas praças mais críticas, visando reduzir possíveis pontos de lentidão operacional.
-- Utilizar o índice de gargalo como indicador complementar ao volume para tomada de decisão estratégica.
-
-## Limitações
+### Limitações
 
 O fator de desgaste foi estimado com base na categoria de eixo, como uma aproximação da carga dos veículos. Como o dataset não fornece peso real por eixo, o indicador representa uma proxy e não uma medição direta.
 
 Além disso, em casos de inconsistência de dados, foi adotada uma abordagem conservadora (valor máximo) para evitar subestimação do volume, o que pode introduzir viés em cenários específicos.
 
 **Essas limitações devem ser consideradas na interpretação dos resultados.**
+
+*[Retornar ao sumário](#sumário)* 
