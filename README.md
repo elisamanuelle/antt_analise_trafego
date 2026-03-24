@@ -91,6 +91,8 @@ Observando os resultados da concessionária Rota do Oeste (CRO) em 2025, o princ
 
 ![alt text](image-2.png)
 
+[Acessar Dashboard no Power BI](https://app.powerbi.com/view?r=eyJrIjoiZTNlY2M2NjItZWRhNC00MzMzLWIzYmEtNDU4N2NmYmQ4MGNmIiwidCI6ImJhMjVhMjgxLTY5MTAtNDdhYS1hZTFiLTA2NWIzOGY3ZDVhMSJ9)
+
 Além disso, foi identificado que:
 * Praças como a P2 e a P4 concentram simultaneamente alto volume de tráfego + alto impacto dos veículos (desgate) + significativa participação da praça no fluxo total, resultando em probabilidade de existência de gargalos reais
 * Outras praças, como a P6 e P3, apresentam menor volume em relação as praças anteriores, mas relevante criticidade, sugerindo existência de gargalos ocultos
