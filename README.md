@@ -89,7 +89,7 @@ Observando os resultados da concessionária Rota do Oeste (CRO) em 2025, o princ
 
 > Os veículos comerciais representam 54,60% do volume absoluto de veículos transitados na via da concessionária CRO no período de 2025, sendo os responsáveis por 99,67% dos desgates da via.
 
-![alt text](image-2.png)
+![alt text](dashboard.png)
 
 [Acessar Dashboard no Power BI](https://app.powerbi.com/view?r=eyJrIjoiZTNlY2M2NjItZWRhNC00MzMzLWIzYmEtNDU4N2NmYmQ4MGNmIiwidCI6ImJhMjVhMjgxLTY5MTAtNDdhYS1hZTFiLTA2NWIzOGY3ZDVhMSJ9)
 
